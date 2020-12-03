@@ -1,4 +1,8 @@
-
+#ifndef SOUND_H
+#define SOUND_H
+#include <stdlib.h>
+#include <stdint.h>
+#include <math.h>
 
 template<int T> uint8_t fastDiv(uint8_t inputValue, uint8_t amplitude) {
     if (inputValue == 0)
@@ -276,3 +280,4 @@ template<class T> class StepSequencer {
         }
 };
 
+#endif
