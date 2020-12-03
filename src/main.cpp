@@ -8,6 +8,7 @@
 #define SAMPLE_RATE 15625
 
 const float inv255 = 1 / 255.0;
+const float inv127 = 1 / 127.0;
 const float inv2048 = 1 / 2048.0;
 const float invSampleRate = 1.0 / SAMPLE_RATE;
 
@@ -22,6 +23,10 @@ OscValues synthOsc2;
 
 ReleaseEnvelope<3> relOp;
 ReleaseEnvelope<3> relOp2;
+
+Reverb echo;
+
+Biquad filter;
 
 StepSequencer<float> melody1Sequencer;
 StepSequencer<float> melody2Sequencer;
@@ -43,6 +48,7 @@ float melody2Freq[MELODY2_SIZE];
 #define BPS 4
 
 int stepCounter = 0;
+byte testo = 0;
 
 #define BUFFERSIZE 800
 byte buffer[BUFFERSIZE];
@@ -111,18 +117,21 @@ void setup() {
 
   synthOsc.length = 256;
   synthOsc2.length = 256;
-  relOp.stepsPerReduction = 22;
-  relOp2.stepsPerReduction = 33;
+  relOp.stepsPerReduction = 10;
+  relOp2.stepsPerReduction = 10;
 
-  melody1Sequencer.duration = SAMPLE_RATE / 6;
+  melody1Sequencer.duration = SAMPLE_RATE / 2;
   melody1Sequencer.steps = MELODY_SIZE;
   melody1Sequencer.source = melodyFreq;
   melody1Sequencer.init();
 
-  melody2Sequencer.duration = SAMPLE_RATE / 8;
+  melody2Sequencer.duration = SAMPLE_RATE / 2;
   melody2Sequencer.steps = MELODY2_SIZE;
   melody2Sequencer.source = melody2Freq;
   melody2Sequencer.init();
+
+  filter.lpf(500, 10, invSampleRate);
+  filter.calculate_scaled();
 }
 
 void loop() {
@@ -161,14 +170,20 @@ void loop() {
     melody2Sequencer.step();
         
     int val = (relOp2.outputValue >> 2) + (relOp.outputValue >> 2);
-    OCR2B = val;
+    testo = val;
+    if (val > 127)
+      Serial.println("ACHTUNG");
+    filter.input = toSigned(val) * inv127;
+    filter.step();
+
+    OCR2B = fromSigned(filter.output * 127);
     if (doStep)
       sadSteps++;
     else
       happySteps++;
   }
 
-  if (totalIterations > 100000) {
+  if (totalIterations > 32000) {
     float timePerIteration = (float)totalMicros / totalIterations;
     Serial.print(F("Time per step: "));
     Serial.print(timePerIteration, 5);
@@ -183,6 +198,9 @@ void loop() {
     Serial.print(" (");
     Serial.print((float)sadSteps * 100 / happySteps);
     Serial.println(")");
+    Serial.println(filter.input);
+    Serial.println(testo);
+    Serial.println(filter.output);
     totalIterations = 0;
     totalMicros = 0;
   }
