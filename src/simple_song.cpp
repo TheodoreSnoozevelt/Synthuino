@@ -3,6 +3,21 @@
 #include <stdlib.h>
 
 
+#define DELAYLENGTH 512
+const int offset = 499;
+static unsigned char buffer[DELAYLENGTH] = {0};
+static unsigned int bufferIndex = 0;
+
+unsigned char reverbStep(unsigned char value) {
+  unsigned int tempWriteIndex = (bufferIndex + offset);
+  unsigned int writeIndex1 = tempWriteIndex & ((1 << 9) - 1); 
+  unsigned char newValue = value + buffer[bufferIndex];
+  buffer[writeIndex1] = scale<3>(newValue, 2);
+  bufferIndex++;
+  bufferIndex = bufferIndex & ((1 << 9) - 1);
+  return scale<2>(newValue, 2);
+}
+
 void setup_song(SongData *data) {
   data->stepCounter = 0;
   for (int i=0; i < MELODY_SIZE; i++) {
@@ -38,8 +53,8 @@ void setup_song(SongData *data) {
   data->synthOsc2.length = 256;
   data->synthOsc2.currentStep = 0;
   data->synthOsc2.phaseStep = 0;
-  data->relOp.stepsPerReduction = 10;
-  data->relOp2.stepsPerReduction = 10;
+  data->relOp.stepsPerReduction = 3;
+  data->relOp2.stepsPerReduction = 3;
 
   data->melody1Sequencer.duration = SAMPLE_RATE / 2;
   data->melody1Sequencer.steps = MELODY_SIZE;
@@ -85,6 +100,6 @@ uint8_t step(SongData *data) {
     data->melody1Sequencer.step();
     data->melody2Sequencer.step();
         
-    int val = (data->relOp2.outputValue >> 2) + (data->relOp.outputValue >> 2);
-    return val;
+    int val = (data->relOp2.outputValue >> 1) + (data->relOp.outputValue >> 1);
+    return reverbStep(val);
 }

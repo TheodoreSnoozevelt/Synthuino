@@ -8,7 +8,7 @@ OscValues osc1;
 
 int main() {
     float sampleRate = SAMPLE_RATE; 
-    float duration = 60;     
+    float duration = 10;     
 
     int nSamples = (int)(duration*sampleRate);
     Wave mySound = makeWave((int)sampleRate,1,8);
@@ -20,7 +20,8 @@ int main() {
     float frameData[1];
     for(i=0; i<nSamples; i+=1 ){
         char val = step(&song);
-        frameData[0] = val / 128.0 - 1.0;
+        frameData[0] = ((float)val - 128) / 128.0;
+        //printf("val: %d , sample: %f\n", val, frameData[0]);
         waveAddSample( &mySound, frameData );
     }
 

@@ -4,6 +4,27 @@
 #include <stdint.h>
 #include <math.h>
 
+template<int TAcc> uint8_t scale(uint8_t x, int8_t scale) {
+    uint16_t temp = x << TAcc;
+    if (scale & 0b10000000) {
+        for (int i = 0; i < scale; i++)
+            temp += x;
+    }
+    else {
+        for (int i = 0; i < scale; i++) 
+            temp -= x;
+    }
+    return temp >> TAcc;
+}
+
+template<int TAcc, int TScale> int8_t scale_signed(int8_t x, int8_t sc) {
+    uint8_t absScaled = scale<TAcc, TScale>(abs(x), sc);
+    if (signbit(x))
+        return -absScaled;
+    else
+        return absScaled;
+}
+
 template<int T> uint8_t fastDiv(uint8_t inputValue, uint8_t amplitude) {
     if (inputValue == 0)
         return 0;
@@ -18,7 +39,8 @@ template<int T> uint8_t fastDiv(uint8_t inputValue, uint8_t amplitude) {
     return temp >> T;
 }
 
-const unsigned long maxPhaseStep = 1L << 18;
+const int phaseStepScale = 10;
+const unsigned long maxPhaseStep = 1L << (8 + phaseStepScale);
 
 struct OscValues {
     unsigned short length;
@@ -30,15 +52,14 @@ struct OscValues {
 
 inline void osc_step(OscValues *values, uint8_t *array) {
     values->currentStep += values->phaseStep;
-    if (values->currentStep >= maxPhaseStep)
-        values->currentStep -= maxPhaseStep;
-    values->output = array[values->currentStep >> 10];
+    values->currentStep = values-> currentStep & (maxPhaseStep - 1);
+    values->output = array[values->currentStep >> phaseStepScale];
 }
 
 #define OSC_STEP(val, arr) val.currentStep += val.phaseStep; \
     if (val.currentStep >= maxPhaseStep) \
         val.currentStep -= maxPhaseStep; \
-    val.output = arr[val.currentStep >> 10];
+    val.output = arr[val.currentStep >> phaseStepScale];
 
 #define OSC_CALCULATE_PHASE_STEP(val, inv) val.phaseStep = inv * val.frequency * maxPhaseStep;
 
