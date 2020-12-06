@@ -5,20 +5,13 @@
 
 bool doStep = false;
 
-byte testo = 0;
 
-#define BUFFERSIZE 800
-byte buffer[BUFFERSIZE];
-int bufferPos = 0;
 
 long stepMicros = 0;
 long totalMicros = 0;
 long totalIterations = 0;
+long timeTaken = 0;
 float maxTimePerIteration = 1000000.0 * invSampleRate;
-
-long happySteps = 0;
-long sadSteps = 0;
-
 SongData song;
 
 void initializeTimers() {
@@ -27,7 +20,7 @@ void initializeTimers() {
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1 = 0;
-  OCR1A = 3;
+  OCR1A = CLOCK_DIVIDER;
   TCCR1B |= (1 << CS12);
   TCCR1B |= (1 << WGM12);
   TIMSK1 |= (1 << OCIE1A);
@@ -44,46 +37,34 @@ void setup() {
   Serial.begin(115200);
   setup_song(&song);
   initializeTimers();
-
-
+  Serial.print(F("Sample rate: "));
+  Serial.print(SAMPLE_RATE);
+  Serial.println(F("Hz"));
 }
 
 void loop() {
-  stepMicros = micros();
-
   if (doStep) {
+    long start = micros();
     doStep = false;
     byte val = step(&song);
 
     OCR2B = val;
-    if (doStep)
-      sadSteps++;
-    else
-      happySteps++;
-  }
+    
+    totalIterations++;
+    timeTaken += micros() - start;
 
-  if (totalIterations > 32000) {
-    float timePerIteration = (float)totalMicros / totalIterations;
-    Serial.print(F("Time per step: "));
-    Serial.print(timePerIteration, 5);
-    Serial.println(F(" microseconds"));
-    Serial.print(F("capacity used: "));
-    Serial.print(timePerIteration / maxTimePerIteration * 100);
-    Serial.println("%");
-    Serial.print(F("Number of good/bad steps: "));
-    Serial.print(happySteps);
-    Serial.print(" ");
-    Serial.print(sadSteps);
-    Serial.print(" (");
-    Serial.print((float)sadSteps * 100 / happySteps);
-    Serial.println(")");
-    totalIterations = 0;
-    totalMicros = 0;
+    if (totalIterations > 64000) {
+      float timePerIteration = (float)timeTaken / totalIterations;
+      Serial.print(F("Time per step: "));
+      Serial.print(timePerIteration, 5);
+      Serial.print(F(" µs ("));
+      Serial.print(timePerIteration / maxTimePerIteration * 100);
+      Serial.println("%)");
+      totalIterations = 0;
+      timeTaken = 0;
+    }
   }
   
-  int diff = micros() - stepMicros;
-  totalMicros += diff;
-  totalIterations += 1;
 }
 
 ISR(TIMER1_COMPA_vect) { 

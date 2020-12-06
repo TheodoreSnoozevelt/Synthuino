@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include <stdio.h>
+
+#define OSC_SIZE 7
+
 
 template<int TAcc> uint8_t scale(uint8_t x, int8_t scale) {
     uint16_t temp = x << TAcc;
@@ -39,8 +43,8 @@ template<int T> uint8_t fastDiv(uint8_t inputValue, uint8_t amplitude) {
     return temp >> T;
 }
 
-const int phaseStepScale = 10;
-const unsigned long maxPhaseStep = 1L << (8 + phaseStepScale);
+#define PHASE_STEP_SCALE 8
+const unsigned long maxPhaseStep = 1L << ((OSC_SIZE - 1) + PHASE_STEP_SCALE);
 
 struct OscValues {
     unsigned short length;
@@ -53,13 +57,13 @@ struct OscValues {
 inline void osc_step(OscValues *values, uint8_t *array) {
     values->currentStep += values->phaseStep;
     values->currentStep = values-> currentStep & (maxPhaseStep - 1);
-    values->output = array[values->currentStep >> phaseStepScale];
+    values->output = array[values->currentStep >> PHASE_STEP_SCALE];
 }
 
 #define OSC_STEP(val, arr) val.currentStep += val.phaseStep; \
-    if (val.currentStep >= maxPhaseStep) \
-        val.currentStep -= maxPhaseStep; \
-    val.output = arr[val.currentStep >> phaseStepScale];
+    val.currentStep += val.phaseStep; \
+    val.currentStep = val.currentStep & ((1L << (OSC_SIZE + 8)) - 1); \
+    val.output = arr[val.currentStep >> PHASE_STEP_SCALE];
 
 #define OSC_CALCULATE_PHASE_STEP(val, inv) val.phaseStep = inv * val.frequency * maxPhaseStep;
 
@@ -248,7 +252,7 @@ template<int T> class ReleaseEnvelope {
     public:
         uint8_t inputGate;
         uint8_t inputValue;
-        int stepsPerReduction;
+        unsigned char stepsPerReduction;
         uint8_t outputValue;
 
         void step() {
@@ -274,12 +278,12 @@ template<int T> class ReleaseEnvelope {
 template<class T> class StepSequencer {
     private:
         int counter = 0;
-        int currentStep = 0;
+        unsigned char currentStep = 0;
     public:
         T *source;
         T output;
         int duration;
-        int steps;
+        unsigned char steps;
         uint8_t gate = 0;
 
         void init() {
@@ -288,6 +292,7 @@ template<class T> class StepSequencer {
         }
 
         void step() {
+            //printf("step %d %d %d", counter, gate, output);
             counter++;
             gate = 0;
             if (counter >= duration) {
