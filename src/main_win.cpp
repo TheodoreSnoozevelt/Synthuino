@@ -2,13 +2,14 @@
 #include <simple_song.h>
 #include <stdio.h>
 #include "wav.h"
-
+#include <math.h>
+#include <maybe_progmem.h>
 
 OscValues osc1;
 
 int main() {
     float sampleRate = SAMPLE_RATE; 
-    float duration = 10;     
+    float duration = 30;     
 
     int nSamples = (int)(duration*sampleRate);
     Wave mySound = makeWave((int)sampleRate,1,8);
@@ -16,6 +17,35 @@ int main() {
 
     SongData song;
     setup_song(&song);
+
+    FILE* f = fopen("test.c", "w");
+    fprintf(f, "uint8_t PROGMEM prog_sin[] = { ");
+    for (int x=0; x < 1024; x++) {
+        fprintf(f, "%d", (int)(127.0 + sin(PI2 * x / 1024) * 127.0));
+        if (x != 1023)
+            fprintf(f, ", ");
+    }
+    fprintf(f, " }; \n");
+
+    fprintf(f, "uint8_t PROGMEM prog_rand[] = { ");
+    for (int x=0; x < 1024; x++) {
+        fprintf(f, "%d", (int)rand() % 256);
+        if (x != 1023)
+            fprintf(f, ", ");
+    }
+    fprintf(f, " };\n");
+
+    fprintf(f, "float PROGMEM prog_jingle_bells[] = { ");
+    for (int x=0; x < MELODY_SIZE; x++) {
+        int note = PROGMEM_GET_BYTE(melody, x);
+        float val = note < 0 ? 0 : (pow(2, note / 12.0) * 660);
+        fprintf(f, "%f", val);
+        if (x != 1023)
+            fprintf(f, ", ");
+    }
+    fprintf(f, " };");
+    fclose(f);
+
     int i;
     float frameData[1];
     for(i=0; i<nSamples; i+=1 ){

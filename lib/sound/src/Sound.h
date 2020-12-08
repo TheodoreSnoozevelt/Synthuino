@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <stdio.h>
+#include <maybe_progmem.h>
 
 #define OSC_SIZE 7
 
@@ -60,12 +61,23 @@ inline void osc_step(OscValues *values, uint8_t *array) {
     values->output = array[values->currentStep >> PHASE_STEP_SCALE];
 }
 
+#define OSC_PROGMEM_STEP(val, arr) val.currentStep += val.phaseStep; \
+    val.currentStep += val.phaseStep; \
+    val.currentStep = val.currentStep & ((1L << (18)) - 1); \
+    val.output = PROGMEM_GET_BYTE(arr, (val.currentStep >> PHASE_STEP_SCALE));
+
 #define OSC_STEP(val, arr) val.currentStep += val.phaseStep; \
     val.currentStep += val.phaseStep; \
     val.currentStep = val.currentStep & ((1L << (OSC_SIZE + 8)) - 1); \
     val.output = arr[val.currentStep >> PHASE_STEP_SCALE];
 
+#define OSC_STEP_PGM(val, arr) val.currentStep += val.phaseStep; \
+    val.currentStep += val.phaseStep; \
+    val.currentStep = val.currentStep & ((1L << (OSC_SIZE + 8)) - 1); \
+    val.output = arr[val.currentStep >> PHASE_STEP_SCALE];
+
 #define OSC_CALCULATE_PHASE_STEP(val, inv) val.phaseStep = inv * val.frequency * maxPhaseStep;
+#define OSC_PROGMEM_CALCULATE_PHASE_STEP(val, inv) val.phaseStep = inv * val.frequency * (1L << ((10 - 1) + PHASE_STEP_SCALE));
 
 inline void osc_calculate_phase_step(OscValues *values, float invSampleRate) {
     values->phaseStep = invSampleRate * values->frequency * maxPhaseStep;
@@ -287,7 +299,7 @@ template<class T> class StepSequencer {
         uint8_t gate = 0;
 
         void init() {
-            output = source[0];
+            output = getItem(0);
             gate = 1;
         }
 
@@ -297,12 +309,48 @@ template<class T> class StepSequencer {
             gate = 0;
             if (counter >= duration) {
                 counter = 0;
-                output = source[currentStep];
+                output = getItem(currentStep);
                 gate = 1;
                 currentStep++;
                 if (currentStep >= steps)
                     currentStep = 0;
             }
+        }
+
+        T getItem(unsigned char step) {
+            return source[step];
+        }
+};
+
+class ProgmemFloatSequencer {
+    private:
+        int counter = 0;
+        unsigned char currentStep = 0;
+    public:
+        float output;
+        int duration;
+        unsigned char steps;
+        uint8_t gate = 0;
+
+        void init() {
+            gate = 1;
+        }
+
+        void step(const float *source) {
+
+            counter++;
+            gate = 0;
+            if (counter >= duration) {
+                counter = 0;
+                output = getItem(currentStep, source);
+                gate = 1;
+                currentStep++;
+                if (currentStep >= steps)
+                    currentStep = 0;
+            }
+        }
+        float getItem(unsigned char step, const float *source) {
+            return PROGMEM_GET_FLOAT(source, step);
         }
 };
 
